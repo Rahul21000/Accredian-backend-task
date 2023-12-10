@@ -1,15 +1,8 @@
 const User = require("../models/user.model");
+const config = require("../config/auth.config");
 const nodemailer = require("nodemailer");
 const jwt = require("jsonwebtoken");
 const bcrypt = require("bcryptjs");
-const dotenv = require("dotenv");
-dotenv.config();
-
-const secret_key = process.env.SECRET_KEY;
-const algorithm = process.env.ALGORITHM;
-const your_email = process.env.YOUR_EMAIL;
-const reset_url = process.env.RESET_URL;
-const password = process.env.PASSWORD;
 
 exports.signup = async (req, res) => {
   try {
@@ -20,7 +13,7 @@ exports.signup = async (req, res) => {
       cpassword: bcrypt.hashSync(req.body.password, 12),
     });
 
-    if (createUser) res.send({ message: "User registered successfully!" });
+    if (createUser) res.send({ message: "Registered successfully!" });
   } catch (error) {
     res.status(500).send({ message: error.message });
   }
@@ -33,7 +26,7 @@ exports.signin = async (req, res) => {
     });
 
     if (!user) {
-      return res.status(404).send({ message: "User Not found." });
+      return res.status(404).send({ message: "User Not found!" });
     }
 
     const passwordIsValid = bcrypt.compareSync(
@@ -47,18 +40,16 @@ exports.signin = async (req, res) => {
       });
     }
 
-    const token = jwt.sign({ username: user.username }, secret_key, {
-      algorithm: algorithm,
+    const token = jwt.sign({ username: user.username }, config.secret_key, {
+      algorithm: config.algorithm,
       allowInsecureKeySizes: true,
       expiresIn: 129600, // 36 hours
     });
-
+    
     req.session.token = token;
 
     return res.status(200).send({
-      username: user.username,
-      email: user.email,
-      token: token,
+      message: "You've been signed in!",
     });
   } catch (error) {
     return res.status(500).send({ message: error.message });
@@ -68,10 +59,11 @@ exports.signin = async (req, res) => {
 const transporter = nodemailer.createTransport({
   service: "gmail",
   auth: {
-    user: your_email,
-    pass: password,
+    user: config.your_email,
+    pass: config.password,
   },
 });
+
 
 exports.signout = async (req, res) => {
   try {
@@ -90,17 +82,21 @@ exports.reset = async (req, res) => {
       $or: [{ username: req.body.username }, { email: req.body.email }],
     });
 
-    const resetToken = jwt.sign({ username: req.body.username }, secret_key, {
-      // algorithm: ["HS256"],
-      allowInsecureKeySizes: true,
-      expiresIn: 144000,
-    });
+    const resetToken = jwt.sign(
+      { username: req.body.username },
+      config.secret_key,
+      {
+        // algorithm: ["HS256"],
+        allowInsecureKeySizes: true,
+        expiresIn: 144000,
+      }
+    );
 
     const mailOption = {
-      from: your_email,
+      from: config.your_email,
       to: existUser.email,
       subject: "Password Reset",
-      text: `Click on the following link to reset your password: ${reset_url}/${resetToken}`,
+      text: `Click on the following link to reset your password: ${config.reset_url}/${config.resetToken}`,
     };
     transporter.sendMail(mailOption, (err, info) => {
       if (err) {
